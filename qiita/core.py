@@ -10,7 +10,11 @@ import re
 
 import json
 
-from .qiita_api_auth import QiitaAccessTokenHandler
+import yaml
+
+from qiita.qiita_api_auth import QiitaAccessTokenHandler
+
+from os.path import expanduser
 
 
 def main():
@@ -86,17 +90,16 @@ def main():
         if re.match(r'^\-', k) and v != 'None']
     params.extend(options)
 
-    access_token = os.getenv('QIITA_PY_CLI_ACCESS_TOKEN')
-    if command[0] == 'init' or access_token is None:
-      access_token = get_access_token()
+    is_init = command[0] == 'init'
+    access_token = get_access_token(is_init)
 
-    if access_token is None:
+    if access_token is None and is_init == False:
       print('利用するにはQiitaのreadとwriteが許可されたアクセストークンが必要です')
       print('アクセストークンを取得するにはQiitaにログインして下記のURLへアクセスしてください')
       print('https://qiita.com/settings/tokens/new')
       return
 
-    if command[0] == 'init':
+    if is_init:
       return
 
     client = QiitaClient(access_token=access_token)
@@ -104,7 +107,21 @@ def main():
     print(json.dumps(res.to_json(), ensure_ascii=False))
 
 
-def get_access_token():
+def get_access_token(init=False):
+  access_token_name = 'QIITA_PY_CLI_ACCESS_TOKEN'
+
+  if init == False:
+    # 環境変数から取得する
+    access_token = os.getenv(access_token_name)
+    if access_token is not None:
+      return access_token
+
+    # 設定ファイルから取得する
+    config = get_config()
+    if access_token_name in config:
+      return config[access_token_name]
+
+  # Oauth2認証で取得する
   client_id = os.getenv('QIITA_PY_CLI_CLIENT_ID')
   client_secret = os.getenv('QIITA_PY_CLI_CLIENT_SECRET')
   if client_id is not None and client_secret is not None:
@@ -114,11 +131,30 @@ def get_access_token():
     access_token = input('Qiitaのアクセストークンを入力してください: ')
 
   if access_token != '':
-    os.environ['QIITA_PY_CLI_ACCESS_TOKEN'] = str(access_token)
+    put_config({access_token_name: access_token})
   else:
-    access_token = os.getenv('QIITA_PY_CLI_ACCESS_TOKEN')
+    access_token = os.getenv(access_token_name)
   return access_token
 
+
+def get_config():
+  config = {}
+  file_path = _get_config_path()
+  if os.path.isfile(file_path):
+    with open(file_path, 'r') as config_file:
+      config = yaml.load(config_file)
+  return config
+
+
+def put_config(config):
+  file_path = _get_config_path()
+  with open(file_path, 'w') as config_file:
+    yaml.dump(config, config_file, default_flow_style=False)
+
+
+def _get_config_path():
+  home = expanduser("~")
+  return f'{home}/.qiita-py-cli.yml'
 
 if __name__ == '__main__':
   main()
