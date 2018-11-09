@@ -10,12 +10,15 @@ import re
 
 import json
 
+from .qiita_api_auth import QiitaAccessTokenHandler
+
 
 def main():
-  _USAGE = '''
+    _USAGE = '''
   Qiita Python CLI
 
   Usage:
+    qiita init
     qiita create_access_token [--params=<kn> --headers=<kn>]
     qiita create_expanded_template [--params=<kn> --headers=<kn>]
     qiita create_item [--params=<kn> --headers=<kn>]
@@ -73,23 +76,48 @@ def main():
     --params=<kn>      params [default: None]
     --headers=<kn>     headers [default: None]
   '''
-  all_params = docopt(_USAGE)
-  command = [k for k, v in all_params.items() if v == True]
-  params = [
-    v for k, v in all_params.items()
-    if re.match(r'\<.*\>', k) and v is not None]
-  options = [
-    json.loads(v) for k, v in all_params.items()
-    if re.match(r'^\-', k) and v != 'None']
-  print(f'command: {command[0]}')
-  print(f'options: {options}')
-  params.extend(options)
+    all_params = docopt(_USAGE)
+    command = [k for k, v in all_params.items() if v == True]
+    params = [
+        v for k, v in all_params.items()
+        if re.match(r'\<.*\>', k) and v is not None]
+    options = [
+        json.loads(v) for k, v in all_params.items()
+        if re.match(r'^\-', k) and v != 'None']
+    params.extend(options)
 
-  home = expanduser("~")
-  config_file = os.path.join(home, '.qiita-cli.yaml')
-  client = QiitaClient(config_file=config_file)
-  res = getattr(client, command[0])(*params)
-  print(res.to_json())
+    access_token = os.getenv('QIITA_PY_CLI_ACCESS_TOKEN')
+    if command[0] == 'init' or access_token is None:
+      access_token = get_access_token()
+
+    if access_token is None:
+      print('利用するにはQiitaのreadとwriteが許可されたアクセストークンが必要です')
+      print('アクセストークンを取得するにはQiitaにログインして下記のURLへアクセスしてください')
+      print('https://qiita.com/settings/tokens/new')
+      return
+
+    if command[0] == 'init':
+      return
+
+    client = QiitaClient(access_token=access_token)
+    res = getattr(client, command[0])(*params)
+    print(json.dumps(res.to_json(), ensure_ascii=False))
+
+
+def get_access_token():
+  client_id = os.getenv('QIITA_PY_CLI_CLIENT_ID')
+  client_secret = os.getenv('QIITA_PY_CLI_CLIENT_SECRET')
+  if client_id is not None and client_secret is not None:
+    token_handler = QiitaAccessTokenHandler(client_id, client_secret)
+    access_token = token_handler.get_access_token()
+  else:
+    access_token = input('Qiitaのアクセストークンを入力してください: ')
+
+  if access_token != '':
+    os.environ['QIITA_PY_CLI_ACCESS_TOKEN'] = str(access_token)
+  else:
+    access_token = os.getenv('QIITA_PY_CLI_ACCESS_TOKEN')
+  return access_token
 
 
 if __name__ == '__main__':
