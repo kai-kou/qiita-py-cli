@@ -17,6 +17,7 @@ https://qiita.com/api/v2/access_tokens
 ```sh
 > git clone https://github.com/kai-kou/qiita-py-cli.git
 > cd qiita-py-cli
+> pip install -r requirements.txt
 > python setup.py install
 
 > qiita init
@@ -31,4 +32,11 @@ Qiitaのアクセストークンは環境変数に設定することもできま
 
 # fish
 > set -x QIITA_PY_CLI_ACCESS_TOKEN <Qiitaのアクセストークン>
+```
+
+アンインストールは以下のように行います。  
+
+```sh
+> python setup.py install --record files.txt
+> cat files.txt | xargs rm -rf
 ```
