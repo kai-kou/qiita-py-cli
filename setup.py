@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 setup(
   name="QiitaPyCli",
   version="0.0.1",
-  description="Qiita API コマンドラインツール",
+  description="Qiita API v2のコマンドラインツール",
   author="kai_kou",
   packages=find_packages(),
   install_requires=['docopt'],
